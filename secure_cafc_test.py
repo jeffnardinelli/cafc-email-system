@@ -217,18 +217,12 @@ def main():
     # Save HTML preview
     save_html_preview(decisions)
     
-    # Ask before sending
-    print("\nReady to send test email?")
-    response = input("Type 'yes' to send, or press Enter to skip: ").strip().lower()
-    
-    if response == 'yes':
-        send_test_email(decisions)
-    else:
-        print("Skipped sending test email")
+    # Automatically send email (no prompt in automated mode)
+    print("\nAutomatically sending email (running in automated mode)...")
+    send_test_email(decisions)
     
     print("\n" + "="*60)
     print("TEST COMPLETE")
-    print("="*60)
 
 
 if __name__ == "__main__":
