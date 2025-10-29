@@ -206,6 +206,13 @@ Full decision text:
             )
             
             summary = message.content[0].text.strip()
+            
+            # Strip markdown formatting (bold, italic, etc)
+            summary = re.sub(r'\*\*([^*]+)\*\*', r'\1', summary)  # Remove **bold**
+            summary = re.sub(r'\*([^*]+)\*', r'\1', summary)      # Remove *italic*
+            summary = re.sub(r'__([^_]+)__', r'\1', summary)      # Remove __bold__
+            summary = re.sub(r'_([^_]+)_', r'\1', summary)        # Remove _italic_
+            
             return summary
             
         except Exception as e:
@@ -390,8 +397,6 @@ class EmailGenerator:
         else:
             html += self._format_no_decisions()
         
-        html += self._format_recent_activity(decisions_by_date)
-        html += self._format_statistics(decisions_by_date)
         html += self._html_footer()
         html += self._html_body_end()
         
@@ -538,8 +543,8 @@ class EmailGenerator:
         date_str = self.today.strftime("%B %d, %Y")
         return f"""        <h1>CAFC Daily Decisions - {date_str}</h1>
         
-        <p>Good morning,</p>
         <p>Here is today's update from the Court of Appeals for the Federal Circuit:</p>
+        <p style="font-size: 13px; color: #e74c3c; font-weight: bold;"><strong>ALL DECISION SUMMARIES ARE AI-GENERATED AND MAY CONTAIN ERRORS. PLEASE REFER TO THE FULL DECISIONS FOR ACCURATE INFORMATION.</strong></p>
         
 """
     
@@ -552,14 +557,21 @@ class EmailGenerator:
         nonprecedential = [d for d in decisions if not d.precedential]
         
         if precedential:
-            html += """            <h3>Precedential Decisions</h3>
+            prec_count = len(precedential)
+            html += f"""            <h3>Precedential Decisions ({prec_count})</h3>
 """
             for decision in precedential:
                 html += self._format_decision_item(decision, precedential=True)
         
         if nonprecedential:
             count = len(nonprecedential)
-            html += f"""            <h3>Nonprecedential Decisions ({count})</h3>
+            # Add divider if we had precedential decisions
+            if precedential:
+                html += """
+            <div class="section-divider"></div>
+            
+"""
+            html += f"""            <h3>Nonprecedential Decisions and Orders ({count})</h3>
 """
             for decision in nonprecedential[:5]:  # Show first 5
                 html += self._format_decision_item(decision, precedential=False)
@@ -577,16 +589,16 @@ class EmailGenerator:
     
     def _format_decision_item(self, decision: CAFCDecision, precedential: bool) -> str:
         prec_class = " precedential" if precedential else ""
-        prec_badge = '<span class="precedential-badge">PRECEDENTIAL</span>' if precedential else ""
         
-        # Add summary if available
+        # Add summary with PDF link at the end if available
         summary_html = ""
         if decision.summary:
+            pdf_link = f' <a href="{decision.link}" style="color: #3498db;">View Full Decision (PDF)</a>' if decision.link else ""
             summary_html = f"""
-                <div class="decision-summary">{decision.summary}</div>"""
+                <div class="decision-summary">{decision.summary}{pdf_link}</div>"""
         
         return f"""            <div class="decision-item{prec_class}">
-                <div class="decision-title">{decision.title}{prec_badge}</div>
+                <div class="decision-title">{decision.title}</div>
                 <div class="decision-meta">
                     Appeal No. {decision.appeal_number} | Origin: {decision.origin} | {decision.doc_type}
                 </div>{summary_html}
@@ -680,10 +692,7 @@ class EmailGenerator:
     
     def _html_footer(self) -> str:
         return """        <div class="footer">
-            <p>This email was automatically generated from the CAFC website. 
-            For the most current information, please visit 
-            <a href="https://www.cafc.uscourts.gov">www.cafc.uscourts.gov</a>.</p>
-            <p><strong>Quinn Emanuel Urquhart & Sullivan, LLP</strong></p>
+            <p><strong>this and other AI-driven projects brought to you by quinn emanuel san francisco</strong></p>
         </div>
 """
     
@@ -724,7 +733,7 @@ class EmailSender:
             # Create message
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
-            msg['From'] = f"CAFC Decisions Bot <{self.from_email}>"
+            msg['From'] = f"CAFC Decisions Recap <{self.from_email}>"
             msg['To'] = ', '.join(self.recipients)
             
             # Attach HTML
@@ -770,23 +779,25 @@ def main():
         print("\n5. Fetching recent decisions from CAFC...")
         all_decisions = scraper.fetch_recent_decisions(days_back=30, summarize_all=True)
         
-        # Filter for today only (using Eastern Time)
+        # Check for decisions from the past 7 days (to catch weekend/holiday postings)
         today = get_eastern_today()
-        today_decisions = [d for d in all_decisions if d.date.date() == today]
+        week_ago = today - timedelta(days=7)
+        recent_decisions = [d for d in all_decisions if d.date.date() > week_ago]
         
-        print(f"\n6. Found {len(today_decisions)} decisions issued today (Eastern Time: {today})")
+        print(f"\n6. Found {len(recent_decisions)} decisions from the past 7 days (Eastern Time: {today})")
         
         # Filter out already-sent decisions
-        new_decisions = [d for d in today_decisions if not database.was_sent(d.appeal_number)]
+        new_decisions = [d for d in recent_decisions if not database.was_sent(d.appeal_number)]
         
         if not new_decisions:
-            print("\n✓ All today's decisions have already been sent. Nothing to do.")
+            print("\n✓ All recent decisions have already been sent. Nothing to do.")
             return
         
         print(f"7. {len(new_decisions)} new decisions to send:")
         for d in new_decisions:
             status = "PRECEDENTIAL" if d.precedential else "Nonprec"
-            print(f"   • {d.title} ({status} - {d.doc_type})")
+            date_str = d.date.strftime("%m/%d")
+            print(f"   • {d.title} ({status} - {d.doc_type}) [{date_str}]")
         
         # Generate email
         print("\n8. Generating HTML email...")
