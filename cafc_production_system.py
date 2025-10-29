@@ -19,6 +19,7 @@ from typing import List, Dict, Optional
 from pypdf import PdfReader
 import io
 import anthropic
+from zoneinfo import ZoneInfo
 
 
 class CAFCDecision:
@@ -38,6 +39,16 @@ class CAFCDecision:
     def __repr__(self):
         status = "Precedential" if self.precedential else "Nonprecedential"
         return f"{self.title} ({status}) - {self.date.strftime('%Y-%m-%d')}"
+
+
+def get_eastern_now():
+    """Get current datetime in Eastern Time"""
+    return datetime.now(ZoneInfo("America/New_York"))
+
+
+def get_eastern_today():
+    """Get today's date in Eastern Time"""
+    return get_eastern_now().date()
 
 
 class DecisionDatabase:
@@ -93,7 +104,7 @@ class DecisionDatabase:
             decision.appeal_number,
             decision.title,
             decision.date.strftime('%Y-%m-%d'),
-            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            get_eastern_now().strftime('%Y-%m-%d %H:%M:%S'),
             1 if decision.precedential else 0
         ))
         
@@ -239,7 +250,7 @@ class CAFCScraper:
                         # Generate summary for today's decisions if enabled
                         if (summarize_all and 
                             self.summarizer and
-                            decision.date.date() == datetime.now().date()):
+                            decision.date.date() == get_eastern_today()):
                             
                             print(f"\n📋 Summarizing: {decision.title}")
                             summary = self.summarizer.fetch_and_summarize(decision)
@@ -358,7 +369,7 @@ class EmailGenerator:
     
     def __init__(self, decisions: List[CAFCDecision]):
         self.decisions = decisions
-        self.today = datetime.now()
+        self.today = get_eastern_now()
     
     def generate_html(self) -> str:
         """Generate complete HTML email"""
@@ -705,7 +716,7 @@ class EmailSender:
     def send_email(self, html_content: str, subject: str = None) -> bool:
         """Send the HTML email"""
         if subject is None:
-            subject = f"CAFC Daily Decisions - {datetime.now().strftime('%B %d, %Y')}"
+            subject = f"CAFC Daily Decisions - {get_eastern_now().strftime('%B %d, %Y')}"
         
         try:
             print(f"\n📧 Sending email to: {', '.join(self.recipients)}")
@@ -759,11 +770,11 @@ def main():
         print("\n5. Fetching recent decisions from CAFC...")
         all_decisions = scraper.fetch_recent_decisions(days_back=30, summarize_all=True)
         
-        # Filter for today only
-        today = datetime.now().date()
+        # Filter for today only (using Eastern Time)
+        today = get_eastern_today()
         today_decisions = [d for d in all_decisions if d.date.date() == today]
         
-        print(f"\n6. Found {len(today_decisions)} decisions issued today")
+        print(f"\n6. Found {len(today_decisions)} decisions issued today (Eastern Time: {today})")
         
         # Filter out already-sent decisions
         new_decisions = [d for d in today_decisions if not database.was_sent(d.appeal_number)]
