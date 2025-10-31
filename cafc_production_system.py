@@ -232,9 +232,8 @@ class CAFCScraper:
         })
         self.summarizer = summarizer
     
-    def fetch_recent_decisions(self, days_back: int = 30, 
-                               summarize_all: bool = True) -> List[CAFCDecision]:
-        """Fetch decisions from RSS feed"""
+    def fetch_recent_decisions(self, days_back: int = 30) -> List[CAFCDecision]:
+        """Fetch decisions from RSS feed (without summaries)"""
         decisions = []
         cutoff_date = datetime.now() - timedelta(days=days_back)
         
@@ -254,17 +253,6 @@ class CAFCScraper:
                 try:
                     decision = self._parse_rss_item(item)
                     if decision and decision.date >= cutoff_date:
-                        # Generate summary for today's decisions if enabled
-                        if (summarize_all and 
-                            self.summarizer and
-                            decision.date.date() == get_eastern_today()):
-                            
-                            print(f"\n📋 Summarizing: {decision.title}")
-                            summary = self.summarizer.fetch_and_summarize(decision)
-                            if summary:
-                                decision.summary = summary
-                                print(f"  ✓ Summary generated")
-                        
                         decisions.append(decision)
                 except Exception as e:
                     print(f"Error parsing item: {e}")
@@ -565,14 +553,9 @@ class EmailGenerator:
 """
             html += f"""            <h3>Nonprecedential Decisions and Orders ({count})</h3>
 """
-            for decision in nonprecedential[:5]:  # Show first 5
+            # Show ALL nonprecedential decisions (no limit)
+            for decision in nonprecedential:
                 html += self._format_decision_item(decision, precedential=False)
-            
-            if count > 5:
-                html += f"""            <p style="font-size: 13px; color: #7f8c8d; margin-left: 15px;">
-                <em>...and {count - 5} additional nonprecedential decisions</em>
-            </p>
-"""
         
         html += """        </div>
         
@@ -684,7 +667,7 @@ class EmailGenerator:
     
     def _html_footer(self) -> str:
         return """        <div class="footer">
-            <p><strong>this and other AI-driven projects brought to you by quinn emanuel san francisco</strong></p>
+            <p><strong>brought to you by quinn emanuel san francisco</strong></p>
         </div>
 """
     
@@ -771,12 +754,11 @@ def main():
         print("\n5. Fetching recent decisions from CAFC...")
         all_decisions = scraper.fetch_recent_decisions(days_back=30, summarize_all=True)
         
-        # Check for decisions from the past 7 days (to catch weekend/holiday postings)
+        # Check for decisions from today only (TEMPORARY - for testing Oct 30 decisions)
         today = get_eastern_today()
-        week_ago = today - timedelta(days=7)
-        recent_decisions = [d for d in all_decisions if d.date.date() > week_ago]
+        recent_decisions = [d for d in all_decisions if d.date.date() == today]
         
-        print(f"\n6. Found {len(recent_decisions)} decisions from the past 7 days (Eastern Time: {today})")
+        print(f"\n6. Found {len(recent_decisions)} decisions from today only (Eastern Time: {today})")
         
         # Filter out already-sent decisions
         new_decisions = [d for d in recent_decisions if not database.was_sent(d.appeal_number)]
@@ -791,16 +773,26 @@ def main():
             date_str = d.date.strftime("%m/%d")
             print(f"   • {d.title} ({status} - {d.doc_type}) [{date_str}]")
         
+        # Generate AI summaries for all new decisions
+        if summarizer and summarizer.client:
+            print("\n8. Generating AI summaries for new decisions...")
+            for decision in new_decisions:
+                print(f"\n📋 Summarizing: {decision.title}")
+                summary = summarizer.fetch_and_summarize(decision)
+                if summary:
+                    decision.summary = summary
+                    print(f"  ✓ Summary generated")
+        
         # Generate email
-        print("\n8. Generating HTML email...")
+        print("\n9. Generating HTML email...")
         generator = EmailGenerator(new_decisions)  # Pass only the new decisions being sent
         html_content = generator.generate_html()
         
         # Send email
-        print("9. Sending email...")
+        print("10. Sending email...")
         if email_sender.send_email(html_content):
             # Mark decisions as sent
-            print("10. Marking decisions as sent in database...")
+            print("11. Marking decisions as sent in database...")
             for decision in new_decisions:
                 database.mark_as_sent(decision)
             
