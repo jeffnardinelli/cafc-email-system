@@ -380,20 +380,12 @@ class EmailGenerator:
     
     def generate_html(self) -> str:
         """Generate complete HTML email"""
-        # Group decisions by date
-        decisions_by_date = defaultdict(list)
-        for decision in self.decisions:
-            decisions_by_date[decision.date.date()].append(decision)
-        
-        # Get today's decisions
-        today_decisions = decisions_by_date.get(self.today.date(), [])
-        
-        # Build HTML
+        # Build HTML with all decisions passed to us (these are the new ones to send)
         html = self._html_header()
         html += self._html_body_start()
         
-        if today_decisions:
-            html += self._format_todays_decisions(today_decisions)
+        if self.decisions:
+            html += self._format_todays_decisions(self.decisions)
         else:
             html += self._format_no_decisions()
         
@@ -733,7 +725,7 @@ class EmailSender:
             # Create message
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
-            msg['From'] = f"CAFC Decisions Recap <{self.from_email}>"
+            msg['From'] = f"CAFC Decisions Bot <{self.from_email}>"
             msg['To'] = ', '.join(self.recipients)
             
             # Attach HTML
@@ -801,7 +793,7 @@ def main():
         
         # Generate email
         print("\n8. Generating HTML email...")
-        generator = EmailGenerator(all_decisions)  # Pass all decisions for context
+        generator = EmailGenerator(new_decisions)  # Pass only the new decisions being sent
         html_content = generator.generate_html()
         
         # Send email
