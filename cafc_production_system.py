@@ -752,7 +752,7 @@ def main():
         
         # Fetch decisions
         print("\n5. Fetching recent decisions from CAFC...")
-        all_decisions = scraper.fetch_recent_decisions(days_back=30, summarize_all=True)
+        all_decisions = scraper.fetch_recent_decisions(days_back=30)
         
         # Check for decisions from today only (TEMPORARY - for testing Oct 30 decisions)
         today = get_eastern_today()
