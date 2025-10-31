@@ -754,11 +754,12 @@ def main():
         print("\n5. Fetching recent decisions from CAFC...")
         all_decisions = scraper.fetch_recent_decisions(days_back=30)
         
-        # Check for decisions from today only (TEMPORARY - for testing Oct 30 decisions)
+        # Check for decisions from the past 7 days (to catch weekend/holiday postings)
         today = get_eastern_today()
-        recent_decisions = [d for d in all_decisions if d.date.date() == today]
+        week_ago = today - timedelta(days=7)
+        recent_decisions = [d for d in all_decisions if d.date.date() > week_ago]
         
-        print(f"\n6. Found {len(recent_decisions)} decisions from today only (Eastern Time: {today})")
+        print(f"\n6. Found {len(recent_decisions)} decisions from the past 7 days (Eastern Time: {today})")
         
         # Filter out already-sent decisions
         new_decisions = [d for d in recent_decisions if not database.was_sent(d.appeal_number)]
