@@ -738,46 +738,38 @@ def main():
     
     try:
         # Initialize components
-        print("\n1. Initializing database...")
-        database = DecisionDatabase()
-        
-        print("2. Initializing AI summarizer...")
+        print("\n1. Initializing AI summarizer...")
         summarizer = DecisionSummarizer()
         
-        print("3. Initializing scraper...")
+        print("2. Initializing scraper...")
         scraper = CAFCScraper(summarizer)
         
-        print("4. Initializing email sender...")
+        print("3. Initializing email sender...")
         email_sender = EmailSender()
         
         # Fetch decisions
-        print("\n5. Fetching recent decisions from CAFC...")
+        print("\n4. Fetching recent decisions from CAFC...")
         all_decisions = scraper.fetch_recent_decisions(days_back=30)
         
-        # Check for decisions from the past 7 days (to catch weekend/holiday postings)
+        # Check for decisions from today only (no database needed - prevents duplicates)
         today = get_eastern_today()
-        week_ago = today - timedelta(days=7)
-        recent_decisions = [d for d in all_decisions if d.date.date() > week_ago]
+        today_decisions = [d for d in all_decisions if d.date.date() == today]
         
-        print(f"\n6. Found {len(recent_decisions)} decisions from the past 7 days (Eastern Time: {today})")
+        print(f"\n6. Found {len(today_decisions)} decisions from today (Eastern Time: {today})")
         
-        # Filter out already-sent decisions
-        new_decisions = [d for d in recent_decisions if not database.was_sent(d.appeal_number)]
-        
-        if not new_decisions:
-            print("\n✓ All recent decisions have already been sent. Nothing to do.")
+        if not today_decisions:
+            print("\n✓ No decisions issued today. Nothing to send.")
             return
         
-        print(f"7. {len(new_decisions)} new decisions to send:")
-        for d in new_decisions:
+        print(f"7. {len(today_decisions)} decisions to send:")
+        for d in today_decisions:
             status = "PRECEDENTIAL" if d.precedential else "Nonprec"
-            date_str = d.date.strftime("%m/%d")
-            print(f"   • {d.title} ({status} - {d.doc_type}) [{date_str}]")
+            print(f"   • {d.title} ({status} - {d.doc_type})")
         
-        # Generate AI summaries for all new decisions
+        # Generate AI summaries for all today's decisions
         if summarizer and summarizer.client:
-            print("\n8. Generating AI summaries for new decisions...")
-            for decision in new_decisions:
+            print("\n8. Generating AI summaries for today's decisions...")
+            for decision in today_decisions:
                 print(f"\n📋 Summarizing: {decision.title}")
                 summary = summarizer.fetch_and_summarize(decision)
                 if summary:
@@ -786,23 +778,16 @@ def main():
         
         # Generate email
         print("\n9. Generating HTML email...")
-        generator = EmailGenerator(new_decisions)  # Pass only the new decisions being sent
+        generator = EmailGenerator(today_decisions)
         html_content = generator.generate_html()
         
         # Send email
         print("10. Sending email...")
-        if email_sender.send_email(html_content):
-            # Mark decisions as sent
-            print("11. Marking decisions as sent in database...")
-            for decision in new_decisions:
-                database.mark_as_sent(decision)
-            
-            print("\n" + "="*60)
-            print("✓ SUCCESS! Email sent and database updated.")
-            print("="*60)
-        else:
-            print("\n✗ Email sending failed. Decisions NOT marked as sent.")
-            sys.exit(1)
+        email_sender.send_email(html_content)
+        
+        print("\n" + "="*60)
+        print("✓ SUCCESS! Email sent.")
+        print("="*60)
         
     except Exception as e:
         print(f"\n✗ Error: {e}")
