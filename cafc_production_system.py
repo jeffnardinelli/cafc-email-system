@@ -340,14 +340,18 @@ class CAFCScraper:
                     print(f"  DEBUG - Extracted PDF link: {pdf_link}")
                 else:
                     print(f"  DEBUG - No PDF link found in description, using fallback")
-                    # Fallback: construct from webpage link if extraction fails
+                    # Fallback: construct from webpage link
+                    # Webpage: .../11-04-2025-24-1071-...-order-24-1071-order-11-4-2025_2598245/
+                    # Extract the date and ID from the webpage URL
                     if webpage_link:
-                        id_match = re.search(r'_(\d+)/?$', webpage_link)
-                        if id_match:
-                            doc_id = id_match.group(1)
-                            # Format date without leading zeros (e.g., 11-3-2025 not 11-03-2025)
-                            date_formatted = f"{decision_date.month}-{decision_date.day}-{decision_date.year}"
-                            pdf_link = f"https://www.cafc.uscourts.gov/opinions-orders/{appeal_number}.{doc_type}.{date_formatted}_{doc_id}.pdf"
+                        # Extract date from URL (already in correct format like 11-4-2025)
+                        url_date_match = re.search(r'/(\d{1,2}-\d{1,2}-\d{4})-\d+-\d+', webpage_link)
+                        url_id_match = re.search(r'_(\d+)/?$', webpage_link)
+                        
+                        if url_date_match and url_id_match:
+                            date_from_url = url_date_match.group(1)  # Already formatted correctly!
+                            doc_id = url_id_match.group(1)
+                            pdf_link = f"https://www.cafc.uscourts.gov/opinions-orders/{appeal_number}.{doc_type}.{date_from_url}_{doc_id}.pdf"
                             print(f"  DEBUG - Constructed PDF link: {pdf_link}")
             
             return CAFCDecision(
