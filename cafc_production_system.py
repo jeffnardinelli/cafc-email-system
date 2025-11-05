@@ -303,6 +303,10 @@ class CAFCScraper:
             link_elem = item.find('link')
             webpage_link = link_elem.text if link_elem is not None else ""
             
+            # DEBUG: See what's in the link field
+            if webpage_link:
+                print(f"  DEBUG - Webpage link: {webpage_link}")
+            
             # Parse the title to extract components
             appeal_match = re.match(r'(\d+-\d+):\s*(.+?)\s*\[([^\]]+)\]', full_title)
             if not appeal_match:
@@ -344,6 +348,7 @@ class CAFCScraper:
                             # Format date without leading zeros (e.g., 11-3-2025 not 11-03-2025)
                             date_formatted = f"{decision_date.month}-{decision_date.day}-{decision_date.year}"
                             pdf_link = f"https://www.cafc.uscourts.gov/opinions-orders/{appeal_number}.{doc_type}.{date_formatted}_{doc_id}.pdf"
+                            print(f"  DEBUG - Constructed PDF link: {pdf_link}")
             
             return CAFCDecision(
                 title=case_title,
