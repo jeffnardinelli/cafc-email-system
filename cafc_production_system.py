@@ -274,16 +274,21 @@ class CAFCScraper:
             
             full_title = title_elem.text
             
-            # Get description - need raw content with HTML tags
+            # Get description - need raw HTML content with tags to extract PDF links
             desc_elem = item.find('description')
+            description = ""
             if desc_elem is not None:
-                # Get raw text/HTML content
-                description = desc_elem.text or ""
-                # Also check if there's CDATA or other content
-                if hasattr(desc_elem, 'itertext'):
-                    description = ''.join(desc_elem.itertext())
-            else:
-                description = ""
+                # Try to get inner HTML content
+                # First try: direct text content
+                if desc_elem.text:
+                    description = desc_elem.text
+                # If that's empty, try getting all content including subelements
+                elif len(desc_elem):
+                    description = ''.join(ET.tostring(child, encoding='unicode') for child in desc_elem)
+                # Last resort: serialize the whole element and extract content
+                else:
+                    full_elem = ET.tostring(desc_elem, encoding='unicode')
+                    description = full_elem
             
             # Get pub date
             pubdate_elem = item.find('pubDate')
@@ -322,16 +327,22 @@ class CAFCScraper:
             # Format: <a href="/opinions-orders/25-1502.OPINION.10-28-2025_2594460.pdf">
             pdf_link = ""
             if description:
+                # Debug: print first 200 chars of description
+                print(f"  DEBUG - Description preview: {description[:200]}")
+                
                 pdf_match = re.search(r'href="(/opinions-orders/[^"]+\.pdf)"', description)
                 if pdf_match:
                     pdf_link = "https://www.cafc.uscourts.gov" + pdf_match.group(1)
+                    print(f"  DEBUG - Extracted PDF link: {pdf_link}")
                 else:
+                    print(f"  DEBUG - No PDF link found in description, using fallback")
                     # Fallback: construct from webpage link if extraction fails
                     if webpage_link:
                         id_match = re.search(r'_(\d+)/?$', webpage_link)
                         if id_match:
                             doc_id = id_match.group(1)
-                            date_formatted = decision_date.strftime("%m-%d-%Y")
+                            # Format date without leading zeros (e.g., 11-3-2025 not 11-03-2025)
+                            date_formatted = f"{decision_date.month}-{decision_date.day}-{decision_date.year}"
                             pdf_link = f"https://www.cafc.uscourts.gov/opinions-orders/{appeal_number}.{doc_type}.{date_formatted}_{doc_id}.pdf"
             
             return CAFCDecision(
