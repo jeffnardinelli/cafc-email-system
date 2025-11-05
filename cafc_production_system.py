@@ -341,11 +341,13 @@ class CAFCScraper:
                 else:
                     print(f"  DEBUG - No PDF link found in description, using fallback")
                     # Fallback: construct from webpage link
-                    # Webpage: .../11-04-2025-24-1071-...-order-24-1071-order-11-4-2025_2598245/
-                    # Extract the date and ID from the webpage URL
+                    # Webpage: .../10-02-2025-24-1071-...-order-24-1071-order-10-2-2025_2598245/
+                    # Note: URL has date TWICE - first with leading zeros, second without
+                    # We want the second one (without leading zeros)
                     if webpage_link:
-                        # Extract date from URL (already in correct format like 11-4-2025)
-                        url_date_match = re.search(r'/(\d{1,2}-\d{1,2}-\d{4})-\d+-\d+', webpage_link)
+                        # Extract date from end of URL (correct format like 10-2-2025)
+                        # Pattern: -order-10-2-2025_ID or -opinion-10-2-2025_ID
+                        url_date_match = re.search(r'-(?:order|opinion|errata|rule_36_judgment)-(\d{1,2}-\d{1,2}-\d{4})_', webpage_link)
                         url_id_match = re.search(r'_(\d+)/?$', webpage_link)
                         
                         if url_date_match and url_id_match:
