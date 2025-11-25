@@ -218,6 +218,54 @@ Full decision text:
         except Exception as e:
             print(f"  ✗ API error: {e}")
             return ""
+    
+    def is_patent_case(self, decision: CAFCDecision, summary: str) -> bool:
+        """Determine if a decision is patent-related using AI"""
+        if not self.client or not summary:
+            return True  # If no AI available, include everything
+        
+        try:
+            prompt = f"""Based on this Federal Circuit case summary, determine if this is a patent law case.
+
+Case: {decision.title}
+Origin: {decision.origin}
+Summary: {summary}
+
+Answer with ONLY "yes" or "no". 
+
+A patent law case involves:
+- Patent infringement, validity, or enforcement
+- USPTO appeals (PTAB decisions, examiner rejections)
+- Patent claim construction or interpretation
+- ITC investigations involving patents
+- Any dispute primarily concerning patent rights
+
+Not patent cases:
+- Veterans benefits appeals
+- Employment/personnel disputes
+- Government contracts or procurement
+- Tax or customs disputes
+- Cases that only tangentially mention patents
+
+Is this a patent law case?"""
+
+            message = self.client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=10,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            
+            answer = message.content[0].text.strip().lower()
+            is_patent = "yes" in answer
+            
+            print(f"  🔍 Patent case? {answer}")
+            return is_patent
+            
+        except Exception as e:
+            print(f"  ✗ Patent check error: {e}")
+            return True  # On error, include the case to be safe
 
 
 class CAFCScraper:
@@ -384,19 +432,29 @@ class CAFCScraper:
 class EmailGenerator:
     """Generates HTML email from CAFC decisions"""
     
-    def __init__(self, decisions: List[CAFCDecision]):
-        self.decisions = decisions
+    def __init__(self, patent_decisions: List[CAFCDecision], non_patent_decisions: List[CAFCDecision] = None):
+        self.patent_decisions = patent_decisions
+        self.non_patent_decisions = non_patent_decisions or []
         self.today = get_eastern_now()
     
     def generate_html(self) -> str:
         """Generate complete HTML email"""
-        # Build HTML with all decisions passed to us (these are the new ones to send)
+        # Build HTML with patent decisions first, then non-patent
         html = self._html_header()
         html += self._html_body_start()
         
-        if self.decisions:
-            html += self._format_todays_decisions(self.decisions)
-        else:
+        if self.patent_decisions:
+            html += self._format_decisions_section(self.patent_decisions, "Patent Cases")
+        
+        if self.non_patent_decisions:
+            # Add clear divider before non-patent section
+            html += """
+        <div style="height: 3px; background: #bdc3c7; margin: 40px 0 30px 0;"></div>
+        
+"""
+            html += self._format_decisions_section(self.non_patent_decisions, "Non-Patent Cases")
+        
+        if not self.patent_decisions and not self.non_patent_decisions:
             html += self._format_no_decisions()
         
         html += self._html_footer()
@@ -550,8 +608,10 @@ class EmailGenerator:
         
 """
     
-    def _format_todays_decisions(self, decisions: List[CAFCDecision]) -> str:
-        html = """        <div class="decision-list">
+    def _format_decisions_section(self, decisions: List[CAFCDecision], section_title: str = "Decisions") -> str:
+        """Format a section of decisions with a title"""
+        html = f"""        <h2 style="color: #2c3e50; font-size: 18px; margin-bottom: 16px;">{section_title}</h2>
+        <div class="decision-list">
 """
         
         # Separate precedential and nonprecedential
@@ -788,19 +848,42 @@ def main():
             status = "PRECEDENTIAL" if d.precedential else "Nonprec"
             print(f"   • {d.title} ({status} - {d.doc_type})")
         
-        # Generate AI summaries for all today's decisions
+        # Generate AI summaries for all today's decisions and classify as patent/non-patent
         if summarizer and summarizer.client:
-            print("\n8. Generating AI summaries for today's decisions...")
+            print("\n8. Generating AI summaries and classifying decisions...")
+            patent_decisions = []
+            non_patent_decisions = []
+            
             for decision in today_decisions:
                 print(f"\n📋 Summarizing: {decision.title}")
                 summary = summarizer.fetch_and_summarize(decision)
                 if summary:
                     decision.summary = summary
                     print(f"  ✓ Summary generated")
+                    
+                    # Check if this is a patent case
+                    if summarizer.is_patent_case(decision, summary):
+                        patent_decisions.append(decision)
+                    else:
+                        print(f"  ⊗ Non-patent case - will show separately")
+                        non_patent_decisions.append(decision)
+                else:
+                    # If summary fails, treat as patent case to be safe
+                    patent_decisions.append(decision)
+            
+            print(f"\n  {len(patent_decisions)} patent cases, {len(non_patent_decisions)} non-patent cases")
+        else:
+            # No AI available, treat all as patent cases
+            patent_decisions = today_decisions
+            non_patent_decisions = []
         
-        # Generate email
+        if not patent_decisions and not non_patent_decisions:
+            print("\n✓ No decisions issued today. Nothing to send.")
+            return
+        
+        # Generate email with both sections
         print("\n9. Generating HTML email...")
-        generator = EmailGenerator(today_decisions)
+        generator = EmailGenerator(patent_decisions, non_patent_decisions)
         html_content = generator.generate_html()
         
         # Send email
