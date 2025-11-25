@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 CAFC Daily Decisions Email System - PRODUCTION VERSION
-Complete integration: scraping + AI summaries + database + Gmail delivery + separate patents above non-patent
+Complete integration: scraping + AI summaries + database + Gmail delivery
 """
 
 import os
@@ -494,6 +494,23 @@ class EmailGenerator:
             margin-bottom: 12px;
             font-size: 16px;
         }
+        .section-patent {
+            background-color: #ffe6e6;
+            padding: 24px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+        .section-non-patent {
+            background-color: #e8f4f8;
+            padding: 24px;
+            border-radius: 5px;
+        }
+        .section-title {
+            color: #2c3e50;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 0 0 20px 0;
+        }
         .decision-list {
             margin: 15px 0;
         }
@@ -609,8 +626,12 @@ class EmailGenerator:
     
     def _format_decisions_section(self, decisions: List[CAFCDecision], section_title: str = "Decisions") -> str:
         """Format a section of decisions with a title"""
-        html = f"""        <h2 style="color: #2c3e50; font-size: 18px; margin-bottom: 16px;">{section_title}</h2>
-        <div class="decision-list">
+        # Determine which section class to use
+        section_class = "section-patent" if "Patent" in section_title else "section-non-patent"
+        
+        html = f"""        <div class="{section_class}">
+            <div class="section-title">{section_title}</div>
+            <div class="decision-list">
 """
         
         # Separate precedential and nonprecedential
@@ -638,7 +659,8 @@ class EmailGenerator:
             for decision in nonprecedential:
                 html += self._format_decision_item(decision, precedential=False)
         
-        html += """        </div>
+        html += """            </div>
+        </div>
         
 """
         return html
