@@ -603,7 +603,6 @@ class EmailGenerator:
         date_str = self.today.strftime("%B %d, %Y")
         return f"""        <h1>CAFC Daily Decisions - {date_str}</h1>
         
-        <p>Here is today's update from the Court of Appeals for the Federal Circuit:</p>
         <p style="font-size: 13px; color: #e74c3c; font-weight: bold;"><strong>ALL DECISION SUMMARIES ARE AI-GENERATED AND MAY CONTAIN ERRORS. PLEASE REFER TO THE FULL DECISIONS FOR ACCURATE INFORMATION.</strong></p>
         
 """
