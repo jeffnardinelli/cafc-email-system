@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 CAFC Daily Decisions Email System - PRODUCTION VERSION
-Complete integration: scraping + AI summaries + database + Gmail delivery
+Complete integration: scraping + AI summaries + database + Gmail delivery + separate patents above non-patent
 """
 
 import os
