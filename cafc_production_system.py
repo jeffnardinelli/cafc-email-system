@@ -198,7 +198,7 @@ Full decision text:
 {full_text}"""
 
             message = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-haiku-4-5-20251001",
                 max_tokens=300,
                 messages=[
                     {"role": "user", "content": prompt}
@@ -250,7 +250,7 @@ Not patent cases:
 Is this a patent law case?"""
 
             message = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-haiku-4-5-20251001",
                 max_tokens=10,
                 messages=[
                     {"role": "user", "content": prompt}
@@ -401,7 +401,8 @@ class CAFCScraper:
                         if url_date_match and url_id_match:
                             date_from_url = url_date_match.group(1)  # Already formatted correctly!
                             doc_id = url_id_match.group(1)
-                            pdf_link = f"https://www.cafc.uscourts.gov/opinions-orders/{appeal_number}.{doc_type}.{date_from_url}_{doc_id}.pdf"
+                            doc_type_for_url = doc_type.replace(' ', '_')
+                            pdf_link = f"https://www.cafc.uscourts.gov/opinions-orders/{appeal_number}.{doc_type_for_url}.{date_from_url}_{doc_id}.pdf"
                             print(f"  DEBUG - Constructed PDF link: {pdf_link}")
             
             return CAFCDecision(
@@ -770,7 +771,7 @@ class EmailGenerator:
     
     def _html_footer(self) -> str:
         return """        <div class="footer">
-            <p><strong>brought to you by quinn emanuel san francisco</strong></p>
+            <p><strong>from simpson thacher san francisco</strong></p>
         </div>
 """
     
