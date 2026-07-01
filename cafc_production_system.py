@@ -198,7 +198,7 @@ Full decision text:
 {full_text}"""
 
             message = self.client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model="claude-sonnet-5",
                 max_tokens=300,
                 messages=[
                     {"role": "user", "content": prompt}
@@ -250,7 +250,7 @@ Not patent cases:
 Is this a patent law case?"""
 
             message = self.client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model="claude-sonnet-5",
                 max_tokens=10,
                 messages=[
                     {"role": "user", "content": prompt}
